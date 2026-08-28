@@ -1,4 +1,4 @@
-name: TikTok Story Data Test
+name: TikTok Network Full Test
 
 on:
   workflow_dispatch:
@@ -18,11 +18,10 @@ jobs:
           pip install playwright
           playwright install chromium
 
-      - name: Inspect TikTok data
+      - name: Capture TikTok API
         run: |
           python - <<'PY'
           import asyncio
-          import json
           from playwright.async_api import async_playwright
 
           USERNAME = "raspbeyih_"
@@ -44,182 +43,83 @@ jobs:
                       )
                   )
 
-                  print("================================")
-                  print("TIKTOK DATA INSPECTION")
-                  print("================================")
-                  print("Username:", USERNAME)
-                  print()
+                  seen = set()
 
                   async def handle_response(response):
 
                       try:
 
-                          if "preload/item_list" not in response.url:
+                          request = response.request
+
+                          if request.resource_type not in [
+                              "xhr",
+                              "fetch"
+                          ]:
                               return
 
-                          if response.status != 200:
+                          url = response.url
+
+                          # Jangan cetak URL berulang
+                          clean_url = url.split("?")[0]
+
+                          if clean_url in seen:
                               return
 
-                          print()
-                          print("================================")
-                          print("ITEM LIST RESPONSE FOUND")
-                          print("================================")
-                          print("Status:", response.status)
-
-                          data = await response.json()
+                          seen.add(clean_url)
 
                           print()
-                          print("TOP LEVEL KEYS:")
-                          print(
-                              list(data.keys())
-                              if isinstance(data, dict)
-                              else type(data)
-                          )
+                          print("========== API ==========")
+                          print("STATUS:", response.status)
+                          print("TYPE:", request.resource_type)
+                          print("URL:", clean_url[:500])
 
-                          # Simpan struktur JSON
-                          with open(
-                              "/tmp/tiktok_response.json",
-                              "w",
-                              encoding="utf-8"
-                          ) as f:
-                              json.dump(
-                                  data,
-                                  f,
-                                  ensure_ascii=False,
-                                  indent=2
-                              )
+                          # Coba baca JSON
+                          try:
 
-                          print()
-                          print(
-                              "JSON berhasil disimpan."
-                          )
+                              data = await response.json()
 
-                          # Cari struktur item
-                          items = []
+                              text = str(data)
 
-                          def find_items(obj):
-
-                              if isinstance(obj, dict):
-
-                                  for key, value in obj.items():
-
-                                      if key in [
-                                          "itemList",
-                                          "item_list",
-                                          "items"
-                                      ] and isinstance(
-                                          value, list
-                                      ):
-                                          items.extend(value)
-
-                                      find_items(value)
-
-                              elif isinstance(obj, list):
-
-                                  for value in obj:
-                                      find_items(value)
-
-                          find_items(data)
-
-                          print()
-                          print(
-                              "Jumlah item ditemukan:",
-                              len(items)
-                          )
-
-                          for i, item in enumerate(
-                              items[:10]
-                          ):
-
-                              if not isinstance(
-                                  item,
-                                  dict
-                              ):
-                                  continue
-
-                              print()
                               print(
-                                  "---------- ITEM",
-                                  i + 1,
-                                  "----------"
+                                  "JSON LENGTH:",
+                                  len(text)
                               )
 
-                              # Hanya field yang relevan
-                              interesting = [
-                                  "id",
-                                  "item_id",
+                              # Cari indikator umum
+                              lower = text.lower()
+
+                              keywords = [
+                                  "story",
+                                  "story_id",
+                                  "storyid",
+                                  "story_type",
                                   "aweme_id",
-                                  "desc",
-                                  "createTime",
-                                  "create_time",
-                                  "author",
-                                  "authorInfo",
-                                  "video",
-                                  "imagePost",
-                                  "stats"
+                                  "item_id",
+                                  "post",
+                                  "repost",
+                                  "video"
                               ]
 
-                              for key in interesting:
+                              found = []
 
-                                  if key not in item:
-                                      continue
+                              for keyword in keywords:
 
-                                  value = item[key]
+                                  if keyword in lower:
+                                      found.append(keyword)
 
-                                  if isinstance(
-                                      value,
-                                      dict
-                                  ):
-                                      print(
-                                          key,
-                                          ":",
-                                          list(
-                                              value.keys()
-                                          )[:30]
-                                      )
-                                  else:
-                                      text = str(value)
-                                      print(
-                                          key,
-                                          ":",
-                                          text[:300]
-                                      )
+                              if found:
+                                  print(
+                                      "KEYWORDS:",
+                                      ", ".join(found)
+                                  )
 
-                          # Cari kata-kata Story di JSON
-                          text = json.dumps(
-                              data,
-                              ensure_ascii=False
-                          ).lower()
-
-                          print()
-                          print("================================")
-                          print("STORY KEYWORD CHECK")
-                          print("================================")
-
-                          keywords = [
-                              "story",
-                              "story_id",
-                              "storyid",
-                              "story_type",
-                              "storyitem",
-                              "story_item",
-                              "storyitemid"
-                          ]
-
-                          for keyword in keywords:
-
+                          except Exception:
                               print(
-                                  keyword,
-                                  "=>",
-                                  text.count(keyword)
+                                  "RESPONSE: non-JSON"
                               )
 
-                      except Exception as e:
-
-                          print(
-                              "ERROR INSIDE RESPONSE:",
-                              repr(e)
-                          )
+                      except Exception:
+                          pass
 
                   page.on(
                       "response",
@@ -228,6 +128,12 @@ jobs:
                           handle_response(response)
                       )
                   )
+
+                  print("================================")
+                  print("TIKTOK FULL NETWORK TEST")
+                  print("================================")
+                  print("Profile:", URL)
+                  print()
 
                   try:
 
@@ -238,17 +144,18 @@ jobs:
                       )
 
                       await page.wait_for_timeout(
-                          15000
+                          20000
                       )
-
-                      print()
-                      print("================================")
-                      print("TEST SELESAI")
-                      print("================================")
 
                   finally:
 
                       await browser.close()
+
+                  print()
+                  print("================================")
+                  print("TOTAL UNIQUE API:")
+                  print(len(seen))
+                  print("================================")
 
           asyncio.run(main())
           PY
