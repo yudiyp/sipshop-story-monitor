@@ -1,17 +1,31 @@
-name: Test SipShop Monitor
+name: Test 1 Minute Monitor
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+  monitor:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Test GitHub Actions
+      - name: Test polling setiap 1 menit
         run: |
-          echo "================================"
-          echo "SipShop Story Monitor"
-          echo "GitHub Actions BERHASIL!"
-          echo "================================"
+          echo "=== MONITOR DIMULAI ==="
+          date
+
+          for i in {1..5}
+          do
+            echo ""
+            echo "===== CHECK $i ====="
+            date
+            echo "Pengecekan ke-$i berhasil."
+
+            if [ $i -lt 5 ]; then
+              echo "Menunggu 60 detik..."
+              sleep 60
+            fi
+          done
+
+          echo ""
+          echo "=== MONITOR SELESAI ==="
           date
