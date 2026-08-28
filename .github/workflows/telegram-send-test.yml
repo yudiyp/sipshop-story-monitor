@@ -1,0 +1,50 @@
+name: Telegram Send Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Telegram notification
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          python - <<'PY'
+          import os
+          import requests
+
+          token = os.environ["TELEGRAM_BOT_TOKEN"]
+          chat_id = "7725653499"
+
+          message = """🚨 TEST NOTIFICATION
+
+SipShop Story Monitor berhasil terhubung!
+
+GitHub → Telegram → iPhone ✅
+
+Ini hanya pesan percobaan."""
+          
+          url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+          response = requests.post(
+              url,
+              json={
+                  "chat_id": chat_id,
+                  "text": message
+              },
+              timeout=30
+          )
+
+          data = response.json()
+
+          print("Telegram API OK:", data.get("ok"))
+
+          if not data.get("ok"):
+              print(data)
+              raise SystemExit(1)
+
+          print("Pesan berhasil dikirim!")
+          PY
