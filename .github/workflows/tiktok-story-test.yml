@@ -1,4 +1,4 @@
-name: TikTok Story Test
+name: TikTok Network Test
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ jobs:
           pip install playwright
           playwright install chromium
 
-      - name: Test TikTok profile
+      - name: Monitor TikTok network
         run: |
           python - <<'PY'
           import asyncio
@@ -28,6 +28,7 @@ jobs:
           URL = f"https://www.tiktok.com/@{USERNAME}"
 
           async def main():
+
               async with async_playwright() as p:
 
                   browser = await p.chromium.launch(
@@ -43,13 +44,92 @@ jobs:
                   )
 
                   print("================================")
-                  print("TIKTOK STORY DETECTION TEST")
+                  print("TIKTOK NETWORK TEST")
                   print("================================")
                   print("Username:", USERNAME)
                   print("URL:", URL)
                   print()
 
+                  requests_found = []
+
+                  async def handle_response(response):
+
+                      try:
+                          request = response.request
+
+                          if request.resource_type not in [
+                              "xhr",
+                              "fetch"
+                          ]:
+                              return
+
+                          url = response.url.lower()
+
+                          interesting = any(
+                              keyword in url
+                              for keyword in [
+                                  "story",
+                                  "aweme",
+                                  "feed",
+                                  "item",
+                                  "user"
+                              ]
+                          )
+
+                          if not interesting:
+                              return
+
+                          print()
+                          print("========== REQUEST ==========")
+                          print("Status:", response.status)
+                          print("Type:", request.resource_type)
+                          print("URL:", response.url[:1000])
+
+                          requests_found.append(response.url)
+
+                          # Coba baca response JSON
+                          try:
+                              data = await response.json()
+
+                              text = str(data)
+
+                              print(
+                                  "Response length:",
+                                  len(text)
+                              )
+
+                              lower = text.lower()
+
+                              for keyword in [
+                                  "story",
+                                  "aweme_id",
+                                  "awemeid",
+                                  "story_id",
+                                  "storyid"
+                              ]:
+
+                                  if keyword in lower:
+                                      print(
+                                          "FOUND:",
+                                          keyword
+                                      )
+
+                          except Exception:
+                              pass
+
+                      except Exception:
+                          pass
+
+                  page.on(
+                      "response",
+                      lambda response:
+                      asyncio.create_task(
+                          handle_response(response)
+                      )
+                  )
+
                   try:
+
                       response = await page.goto(
                           URL,
                           wait_until="domcontentloaded",
@@ -57,141 +137,34 @@ jobs:
                       )
 
                       print(
-                          "HTTP Status:",
-                          response.status if response else "NONE"
+                          "Profile HTTP Status:",
+                          response.status
+                          if response else "NONE"
                       )
 
-                      await page.wait_for_timeout(5000)
-
-                      print("Final URL:", page.url)
-                      print("Page title:", await page.title())
-
-                      html = await page.content()
-                      lower = html.lower()
-
-                      print("HTML length:", len(html))
-                      print()
-
-                      # ==========================================
-                      # CEK BERBAGAI INDIKATOR STORY
-                      # ==========================================
-
-                      print("================================")
-                      print("STORY INDICATORS")
-                      print("================================")
-
-                      indicators = [
-                          "story",
-                          "story_id",
-                          "storyid",
-                          "story_type",
-                          "storyitem",
-                          "story-item",
-                          "story_item",
-                          "stories",
-                          "aweme_id",
-                          "awemeid",
-                      ]
-
-                      for item in indicators:
-                          count = lower.count(item)
-                          print(f"{item:20} => {count}")
-
-                      # ==========================================
-                      # CARI ELEMEN YANG MENGANDUNG STORY
-                      # ==========================================
+                      # Beri TikTok waktu untuk menjalankan
+                      # JavaScript dan memanggil API.
+                      await page.wait_for_timeout(15000)
 
                       print()
                       print("================================")
-                      print("DOM ELEMENTS WITH STORY")
-                      print("================================")
-
-                      elements = await page.locator(
-                          "text=/story/i"
-                      ).all()
-
-                      print("Jumlah text element:", len(elements))
-
-                      for i, element in enumerate(elements[:20]):
-                          try:
-                              text = await element.inner_text()
-                              print(f"[{i}] {text[:200]}")
-                          except:
-                              pass
-
-                      # ==========================================
-                      # CARI LINK YANG MENGANDUNG STORY
-                      # ==========================================
-
-                      print()
-                      print("================================")
-                      print("LINKS WITH STORY")
-                      print("================================")
-
-                      links = await page.locator("a").all()
-
-                      story_links = []
-
-                      for link in links:
-                          try:
-                              href = await link.get_attribute("href")
-                              text = await link.inner_text()
-
-                              combined = (
-                                  (href or "") + " " + (text or "")
-                              ).lower()
-
-                              if "story" in combined:
-                                  story_links.append(
-                                      (href, text)
-                                  )
-                          except:
-                              pass
-
-                      print(
-                          "Jumlah link terkait story:",
-                          len(story_links)
-                      )
-
-                      for href, text in story_links[:20]:
-                          print("TEXT:", text[:100])
-                          print("HREF:", href)
-                          print("---")
-
-                      # ==========================================
-                      # HASIL AKHIR
-                      # ==========================================
-
-                      print()
-                      print("================================")
-                      print("HASIL")
+                      print("NETWORK TEST SELESAI")
                       print("================================")
 
                       print(
-                          "Halaman TikTok berhasil dibuka:",
-                          response.status == 200 if response else False
-                      )
-
-                      print(
-                          "Kata 'story' ditemukan:",
-                          "story" in lower
-                      )
-
-                      print(
-                          "Jumlah elemen text Story:",
-                          len(elements)
-                      )
-
-                      print(
-                          "Jumlah link Story:",
-                          len(story_links)
+                          "Interesting requests:",
+                          len(requests_found)
                       )
 
                   except Exception as e:
-                      print("ERROR:", repr(e))
-                      raise
+
+                      print(
+                          "ERROR:",
+                          repr(e)
+                      )
 
                   finally:
+
                       await browser.close()
 
           asyncio.run(main())
