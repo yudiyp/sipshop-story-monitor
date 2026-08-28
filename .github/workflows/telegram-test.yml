@@ -1,0 +1,47 @@
+name: Telegram Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  telegram:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get Telegram Chat ID
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          python - <<'PY'
+          import os
+          import requests
+
+          token = os.environ["TELEGRAM_BOT_TOKEN"]
+
+          url = f"https://api.telegram.org/bot{token}/getUpdates"
+
+          response = requests.get(url, timeout=30)
+          data = response.json()
+
+          print("Telegram API OK:", data.get("ok"))
+
+          if not data.get("ok"):
+              print("ERROR:", data)
+              raise SystemExit(1)
+
+          updates = data.get("result", [])
+
+          print("Jumlah update:", len(updates))
+
+          for update in updates:
+              message = update.get("message")
+
+              if message:
+                  chat = message.get("chat", {})
+
+                  print("--------------------------------")
+                  print("Chat ID:", chat.get("id"))
+                  print("Chat type:", chat.get("type"))
+                  print("Chat name:", chat.get("first_name"))
+                  print("Message:", message.get("text"))
+          PY
