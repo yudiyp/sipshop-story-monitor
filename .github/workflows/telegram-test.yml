@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Get Telegram Chat ID
+      - name: Check Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
@@ -17,31 +17,65 @@ jobs:
           import requests
 
           token = os.environ["TELEGRAM_BOT_TOKEN"]
+          base = f"https://api.telegram.org/bot{token}"
 
-          url = f"https://api.telegram.org/bot{token}/getUpdates"
+          # Cek webhook
+          response = requests.get(
+              f"{base}/getWebhookInfo",
+              timeout=30
+          )
 
-          response = requests.get(url, timeout=30)
           data = response.json()
 
-          print("Telegram API OK:", data.get("ok"))
+          print("=== WEBHOOK INFO ===")
+          print(data)
 
-          if not data.get("ok"):
-              print("ERROR:", data)
-              raise SystemExit(1)
+          webhook = data.get("result", {})
+          webhook_url = webhook.get("url", "")
+
+          print()
+          print("Webhook URL:", webhook_url)
+
+          if webhook_url:
+              print()
+              print("WEBHOOK AKTIF - menghapus webhook...")
+              
+              delete_response = requests.post(
+                  f"{base}/deleteWebhook",
+                  json={"drop_pending_updates": False},
+                  timeout=30
+              )
+
+              print("Delete webhook:", delete_response.json())
+
+          # Ambil update
+          response = requests.get(
+              f"{base}/getUpdates",
+              params={
+                  "limit": 100,
+                  "allowed_updates": '["message"]'
+              },
+              timeout=30
+          )
+
+          data = response.json()
+
+          print()
+          print("=== GET UPDATES ===")
+          print("Telegram API OK:", data.get("ok"))
 
           updates = data.get("result", [])
 
           print("Jumlah update:", len(updates))
 
           for update in updates:
-              message = update.get("message")
+              message = update.get("message", {})
+              chat = message.get("chat", {})
 
-              if message:
-                  chat = message.get("chat", {})
-
-                  print("--------------------------------")
-                  print("Chat ID:", chat.get("id"))
-                  print("Chat type:", chat.get("type"))
-                  print("Chat name:", chat.get("first_name"))
-                  print("Message:", message.get("text"))
+              print("--------------------------------")
+              print("Chat ID:", chat.get("id"))
+              print("Chat type:", chat.get("type"))
+              print("Nama:", chat.get("first_name"))
+              print("Username:", chat.get("username"))
+              print("Message:", message.get("text"))
           PY
