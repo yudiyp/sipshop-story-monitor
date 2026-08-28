@@ -1,0 +1,66 @@
+name: TikTok Story API Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install requests
+        run: pip install requests
+
+      - name: Test Story endpoint
+        run: |
+          python - <<'PY'
+          import requests
+
+          username = "raspbeyih_"
+
+          url = "https://www.tiktok.com/api/story/user_list/"
+
+          params = {
+              "count": 10,
+              "aid": 1988
+          }
+
+          headers = {
+              "User-Agent": (
+                  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+                  "AppleWebKit/605.1.15 "
+                  "(KHTML, like Gecko) Version/17.0 "
+                  "Mobile/15E148 Safari/604.1"
+              ),
+              "Referer": f"https://www.tiktok.com/@{username}"
+          }
+
+          print("================================")
+          print("TIKTOK STORY API TEST")
+          print("================================")
+          print("Endpoint:", url)
+          print()
+
+          response = requests.get(
+              url,
+              params=params,
+              headers=headers,
+              timeout=30
+          )
+
+          print("HTTP STATUS:", response.status_code)
+          print()
+
+          print("RESPONSE:")
+          print(response.text[:10000])
+
+          print()
+          print("================================")
+          print("TEST SELESAI")
+          print("================================")
+          PY
