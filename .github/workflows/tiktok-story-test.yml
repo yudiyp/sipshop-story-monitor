@@ -1,4 +1,4 @@
-name: TikTok Network Full Test
+name: TikTok Story Click Test
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ jobs:
           pip install playwright
           playwright install chromium
 
-      - name: Capture TikTok API
+      - name: Open TikTok Story
         run: |
           python - <<'PY'
           import asyncio
@@ -36,6 +36,10 @@ jobs:
                   )
 
                   page = await browser.new_page(
+                      viewport={
+                          "width": 390,
+                          "height": 844
+                      },
                       user_agent=(
                           "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
                           "AppleWebKit/605.1.15 (KHTML, like Gecko) "
@@ -49,9 +53,7 @@ jobs:
 
                       try:
 
-                          request = response.request
-
-                          if request.resource_type not in [
+                          if response.request.resource_type not in [
                               "xhr",
                               "fetch"
                           ]:
@@ -59,7 +61,6 @@ jobs:
 
                           url = response.url
 
-                          # Jangan cetak URL berulang
                           clean_url = url.split("?")[0]
 
                           if clean_url in seen:
@@ -70,50 +71,45 @@ jobs:
                           print()
                           print("========== API ==========")
                           print("STATUS:", response.status)
-                          print("TYPE:", request.resource_type)
+                          print("TYPE:", response.request.resource_type)
                           print("URL:", clean_url[:500])
 
-                          # Coba baca JSON
                           try:
 
                               data = await response.json()
 
                               text = str(data)
+                              lower = text.lower()
 
                               print(
                                   "JSON LENGTH:",
                                   len(text)
                               )
 
-                              # Cari indikator umum
-                              lower = text.lower()
+                              found = []
 
-                              keywords = [
+                              for keyword in [
                                   "story",
                                   "story_id",
                                   "storyid",
                                   "story_type",
+                                  "storyitem",
                                   "aweme_id",
-                                  "item_id",
-                                  "post",
-                                  "repost",
-                                  "video"
-                              ]
-
-                              found = []
-
-                              for keyword in keywords:
+                                  "item_id"
+                              ]:
 
                                   if keyword in lower:
                                       found.append(keyword)
 
                               if found:
+
                                   print(
                                       "KEYWORDS:",
                                       ", ".join(found)
                                   )
 
                           except Exception:
+
                               print(
                                   "RESPONSE: non-JSON"
                               )
@@ -130,32 +126,215 @@ jobs:
                   )
 
                   print("================================")
-                  print("TIKTOK FULL NETWORK TEST")
+                  print("TIKTOK STORY CLICK TEST")
                   print("================================")
                   print("Profile:", URL)
                   print()
 
-                  try:
+                  await page.goto(
+                      URL,
+                      wait_until="domcontentloaded",
+                      timeout=60000
+                  )
 
-                      await page.goto(
-                          URL,
-                          wait_until="domcontentloaded",
-                          timeout=60000
-                      )
-
-                      await page.wait_for_timeout(
-                          20000
-                      )
-
-                  finally:
-
-                      await browser.close()
+                  await page.wait_for_timeout(8000)
 
                   print()
                   print("================================")
-                  print("TOTAL UNIQUE API:")
-                  print(len(seen))
+                  print("PAGE ELEMENTS")
                   print("================================")
+
+                  # Ambil semua button
+                  buttons = await page.locator(
+                      "button"
+                  ).all()
+
+                  print(
+                      "Buttons:",
+                      len(buttons)
+                  )
+
+                  for i, button in enumerate(
+                      buttons[:30]
+                  ):
+
+                      try:
+
+                          text = await button.inner_text()
+
+                          aria = await button.get_attribute(
+                              "aria-label"
+                          )
+
+                          title = await button.get_attribute(
+                              "title"
+                          )
+
+                          print(
+                              f"BUTTON {i}:",
+                              "text=",
+                              text[:100],
+                              "aria=",
+                              aria,
+                              "title=",
+                              title
+                          )
+
+                      except:
+                          pass
+
+                  # Ambil gambar/avatar
+                  images = await page.locator(
+                      "img"
+                  ).all()
+
+                  print()
+                  print(
+                      "Images:",
+                      len(images)
+                  )
+
+                  for i, image in enumerate(
+                      images[:30]
+                  ):
+
+                      try:
+
+                          src = await image.get_attribute(
+                              "src"
+                          )
+
+                          alt = await image.get_attribute(
+                              "alt"
+                          )
+
+                          print(
+                              f"IMG {i}:",
+                              "alt=",
+                              alt,
+                              "src=",
+                              (src or "")[:200]
+                          )
+
+                      except:
+                          pass
+
+                  # Cari elemen dengan label story
+                  story_elements = page.locator(
+                      '[aria-label*="story" i], '
+                      '[title*="story" i]'
+                  )
+
+                  count = await story_elements.count()
+
+                  print()
+                  print(
+                      "Story-labelled elements:",
+                      count
+                  )
+
+                  for i in range(
+                      min(count, 20)
+                  ):
+
+                      try:
+
+                          element = story_elements.nth(i)
+
+                          print(
+                              "STORY ELEMENT",
+                              i,
+                              await element.evaluate(
+                                  "(e) => e.outerHTML.slice(0,1000)"
+                              )
+                          )
+
+                      except:
+                          pass
+
+                  print()
+                  print("================================")
+                  print("MENCOBA KLIK STORY")
+                  print("================================")
+
+                  clicked = False
+
+                  # Prioritas: elemen dengan label story
+                  if count > 0:
+
+                      try:
+
+                          await story_elements.first.click(
+                              timeout=5000
+                          )
+
+                          clicked = True
+
+                          print(
+                              "Story element berhasil diklik."
+                          )
+
+                      except Exception as e:
+
+                          print(
+                              "Gagal klik Story element:",
+                              repr(e)
+                          )
+
+                  # Jika tidak ditemukan, coba avatar pertama
+                  if not clicked and len(images) > 0:
+
+                      try:
+
+                          print(
+                              "Mencoba klik avatar pertama..."
+                          )
+
+                          await images[0].click(
+                              timeout=5000
+                          )
+
+                          clicked = True
+
+                          print(
+                              "Avatar berhasil diklik."
+                          )
+
+                      except Exception as e:
+
+                          print(
+                              "Gagal klik avatar:",
+                              repr(e)
+                          )
+
+                  if clicked:
+
+                      print()
+                      print(
+                          "Menunggu request setelah klik..."
+                      )
+
+                      await page.wait_for_timeout(
+                          10000
+                      )
+
+                  else:
+
+                      print(
+                          "Tidak menemukan elemen yang bisa diklik."
+                      )
+
+                  print()
+                  print("================================")
+                  print("TEST SELESAI")
+                  print("================================")
+
+                  print(
+                      "Total API unik:",
+                      len(seen)
+                  )
+
+                  await browser.close()
 
           asyncio.run(main())
           PY
