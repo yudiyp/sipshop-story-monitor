@@ -8,74 +8,69 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check Telegram
+      - name: Listen for Telegram message
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
           python - <<'PY'
           import os
           import requests
+          import time
 
           token = os.environ["TELEGRAM_BOT_TOKEN"]
-          base = f"https://api.telegram.org/bot{token}"
 
-          # Cek webhook
-          response = requests.get(
-              f"{base}/getWebhookInfo",
-              timeout=30
-          )
+          url = f"https://api.telegram.org/bot{token}/getUpdates"
 
-          data = response.json()
-
-          print("=== WEBHOOK INFO ===")
-          print(data)
-
-          webhook = data.get("result", {})
-          webhook_url = webhook.get("url", "")
-
+          print("================================")
+          print("TELEGRAM LISTENER TEST")
+          print("================================")
           print()
-          print("Webhook URL:", webhook_url)
+          print("Menunggu pesan Telegram selama 30 detik...")
+          print("Sekarang kirim TEST ke bot kamu.")
+          print()
 
-          if webhook_url:
-              print()
-              print("WEBHOOK AKTIF - menghapus webhook...")
-              
-              delete_response = requests.post(
-                  f"{base}/deleteWebhook",
-                  json={"drop_pending_updates": False},
-                  timeout=30
-              )
-
-              print("Delete webhook:", delete_response.json())
-
-          # Ambil update
           response = requests.get(
-              f"{base}/getUpdates",
+              url,
               params={
-                  "limit": 100,
-                  "allowed_updates": '["message"]'
+                  "timeout": 25,
+                  "limit": 10
               },
-              timeout=30
+              timeout=35
           )
 
           data = response.json()
 
+          print("API OK:", data.get("ok"))
           print()
-          print("=== GET UPDATES ===")
-          print("Telegram API OK:", data.get("ok"))
+
+          if not data.get("ok"):
+              print("ERROR:")
+              print(data)
+              raise SystemExit(1)
 
           updates = data.get("result", [])
 
           print("Jumlah update:", len(updates))
+          print()
 
           for update in updates:
-              message = update.get("message", {})
-              chat = message.get("chat", {})
 
-              print("--------------------------------")
-              print("Chat ID:", chat.get("id"))
-              print("Chat type:", chat.get("type"))
-              print("Nama:", chat.get("first_name"))
-              print("Username:", chat.get("username"))
-              print("Message:", message.get("text"))
+              print("========== UPDATE ==========")
+              print("Update ID:", update.get("update_id"))
+
+              message = update.get("message")
+
+              if message:
+                  chat = message.get("chat", {})
+
+                  print("Chat ID:", chat.get("id"))
+                  print("Chat Type:", chat.get("type"))
+                  print("First Name:", chat.get("first_name"))
+                  print("Username:", chat.get("username"))
+                  print("Message:", message.get("text"))
+
+          print()
+          print("================================")
+          print("TEST SELESAI")
+          print("================================")
           PY
