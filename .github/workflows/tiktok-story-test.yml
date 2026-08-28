@@ -1,0 +1,102 @@
+name: TikTok Story Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          playwright install chromium
+
+      - name: Test TikTok profile
+        run: |
+          python - <<'PY'
+          import asyncio
+          from playwright.async_api import async_playwright
+
+          USERNAME = "raspbeyih_"
+          URL = f"https://www.tiktok.com/@{USERNAME}"
+
+          async def main():
+              async with async_playwright() as p:
+
+                  browser = await p.chromium.launch(
+                      headless=True
+                  )
+
+                  page = await browser.new_page(
+                      user_agent=(
+                          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+                          "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                          "Version/17.0 Mobile/15E148 Safari/604.1"
+                      )
+                  )
+
+                  print("================================")
+                  print("TIKTOK STORY TEST")
+                  print("================================")
+                  print("Username:", USERNAME)
+                  print("URL:", URL)
+                  print()
+
+                  try:
+                      response = await page.goto(
+                          URL,
+                          wait_until="domcontentloaded",
+                          timeout=60000
+                      )
+
+                      print("HTTP Status:",
+                            response.status if response else "NONE")
+
+                      await page.wait_for_timeout(5000)
+
+                      print("Final URL:", page.url)
+                      print("Page title:", await page.title())
+
+                      html = await page.content()
+
+                      print("HTML length:", len(html))
+
+                      lower = html.lower()
+
+                      print()
+                      print("Story-related keywords:")
+
+                      keywords = [
+                          "story",
+                          "story_id",
+                          "storyid",
+                          "story_type",
+                          "aweme_id"
+                      ]
+
+                      for keyword in keywords:
+                          print(
+                              keyword,
+                              "=>",
+                              keyword in lower
+                          )
+
+                      print()
+                      print("TikTok page berhasil dibuka.")
+
+                  except Exception as e:
+                      print("ERROR:", repr(e))
+                      raise
+
+                  finally:
+                      await browser.close()
+
+          asyncio.run(main())
+          PY
